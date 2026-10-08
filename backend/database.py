@@ -1,6 +1,7 @@
 from ast import Dict
 import sqlite3
 import json
+import csv
 from pathlib import Path
 from datetime import datetime
 
@@ -45,8 +46,7 @@ def save_prediction(predicted_score:float, performance:str,input_data:Dict):
 
         cursor.execute(
           "INSERT INTO predictions (predicted_score, performance) VALUES (?, ?)",
-          (predicted_score, performance)
-    )   
+          (predicted_score, performance))   
 
         connection.commit()
     finally:
@@ -86,7 +86,7 @@ def save_feedback(
      cursor=connection.cursor()
      cursor.execute("""SELECT * FROM predictions WHERE id=?""",(prediction_id))
      prediction=cursor.fetchone()
-
+    
      if prediction is None:
         connection.close()
         return False,"Prediction Not FOUND"
@@ -173,7 +173,7 @@ def prepare_training_dataset():
             connection.close()
             return False,"No valid records found",0
 
-        columns=lisy(training_rows[0].keys())
+        columns=list(training_rows[0].keys())
 
         with open(
             TRAINING_DATASET,"w",
