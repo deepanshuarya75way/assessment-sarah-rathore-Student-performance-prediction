@@ -1,3 +1,4 @@
+from ast import Dict
 import sqlite3
 import json
 from pathlib import Path
@@ -37,7 +38,7 @@ def init_db():
     finally:
         connection.close()
 
-def save_prediction(predicted_score:float, performance:str,input_data:dict):
+def save_prediction(predicted_score:float, performance:str,input_data:Dict):
     connection = get_connection()
     try:
         cursor = connection.cursor()
@@ -53,7 +54,7 @@ def save_prediction(predicted_score:float, performance:str,input_data:dict):
 
        
     
-def get_predictions()->list[dict]:
+def get_predictions()->list[Dict]:
     connection=get_connection()
     try:
         cursor = connection.cursor()
@@ -64,7 +65,7 @@ def get_predictions()->list[dict]:
         return cursor.fetchall()
     finally:
         connection.close()
-        return [dict(row) for row in rows]
+        return [Dict{row} for row in rows]
 
 def delete_predictions():
     connection=get_connection()
@@ -153,7 +154,7 @@ def prepare_training_dataset():
             actual_exam_score=float(row["actual_exam_score)"])
         except(ValueError,TypeError):
             continue
-        i
+        
         if actual_score<0 or actual_score>100:
             continue
 
@@ -162,7 +163,7 @@ def prepare_training_dataset():
         except(json.JSONDecodeError,TypeError):
             continue
 
-        if not isinstance(input_data,dict):
+        if not isinstance(input_data,Dict):
             continue
         input_data["Exam_Score"]=actual_exam_score
         training_rows.append(input_data)
