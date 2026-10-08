@@ -1,440 +1,345 @@
-import { useState, useEffect } from "react"
-import "./App.css"
+import { useState, useEffect } from "react";
+import "./App.css";
+
+const API_URL = "http://127.0.0.1:5000";
+
+const initialFormData = {
+  Hours_Studied: "",
+  Attendance: "",
+  Previous_Scores: "",
+  Tutoring_Sessions: "",
+  Sleep_Hours: "",
+  Physical_Activity: "",
+
+  Parental_Involvement: "Medium",
+  Access_to_Resources: "Medium",
+  Motivation_Level: "Medium",
+  Teacher_Quality: "Medium",
+  Family_Income: "Medium",
+  Peer_Influence: "Neutral",
+
+  Extracurricular_Activities: "No",
+  Internet_Access: "Yes",
+  School_Type: "Public",
+  Learning_Disabilities: "No",
+
+  Parental_Education_Level: "College",
+  Distance_from_Home: "Near",
+  Gender: "Female"
+};
+
+const numericRanges = {
+  Hours_Studied: [1, 44],
+  Attendance: [60, 100],
+  Previous_Scores: [50, 100],
+  Tutoring_Sessions: [0, 8],
+  Sleep_Hours: [4, 10],
+  Physical_Activity: [0, 6]
+};
 
 function App() {
+  const [formData, setFormData] = useState(initialFormData);
+  const [prediction, setPrediction] = useState(null);
+  const[feedback,setFeedback]=useState("");
+  const[actualscore,setActualScore]=useState("");
+  const[message,setMessage]=useState("");
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const [prediction, setPrediction] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [history, setHistory] = useState([])
-  const totalPredictions = history.length
+  const totalPredictions = history.length;
 
-  const averageScore =
-    history.length > 0
-      ? (
-        history.reduce(
-          (sum, record) => sum + Number(record[1]),
-          0
-        ) / history.length
+  const scores = history
+    .map((record) => Number(record.predicted_score))
+    .filter(Number.isFinite);
+
+  const averageScore = scores.length
+    ? (
+        scores.reduce((sum, score) => sum + score, 0) /
+        scores.length
       ).toFixed(2)
-      : 0
+    : 0;
 
-  const highestScore =
-    history.length > 0
-      ? Math.max(...history.map(record => Number(record[1])))
-      : 0
+  const highestScore = scores.length
+    ? Math.max(...scores).toFixed(2)
+    : 0;
 
-  const lowestScore =
-    history.length > 0
-      ? Math.min(...history.map(record => Number(record[1])))
-      : 0
-  const [formData, setFormData] = useState({
-    Hours_Studied: "",
-    Attendance: "",
-    Previous_Scores: "",
-    Tutoring_Sessions: "",
-    Sleep_Hours: "",
-    Physical_Activity: "",
+  const lowestScore = scores.length
+    ? Math.min(...scores).toFixed(2)
+    : 0;
 
-    Parental_Involvement: "Medium",
-    Access_to_Resources: "Medium",
-    Motivation_Level: "Medium",
-    Teacher_Quality: "Medium",
-    Family_Income: "Medium",
-    Peer_Influence: "Neutral",
-
-    Extracurricular_Activities: "No",
-    Internet_Access: "Yes",
-    School_Type: "Public",
-    Learning_Disabilities: "No",
-
-    Parental_Education_Level: "College",
-    Distance_from_Home: "Near",
-    Gender: "Female"
-  })
-
-
-  // Load prediction history when page opens
-  useEffect(() => {
-
-    fetch("http://127.0.0.1:5000/history")
-      .then(response => response.json())
-      .then(data => {
-        setHistory(data)
-      })
-      .catch(error => {
-        console.log(error)
-      })
-
-  }, [])
-
-
-  // Handle input changes
-  const handleChange = (event) => {
-
-    const { name, value } = event.target
-
-    setFormData({
-      ...formData,
-      [name]: value
-    })
-  }
-
-
-  // Predict exam score
-  const handlePredict = async () => {
-
-    const requiredFields = [
-      "Hours_Studied",
-      "Attendance",
-      "Previous_Scores",
-      "Tutoring_Sessions",
-      "Sleep_Hours",
-      "Physical_Activity"
-    ]
-
-
-    // Check empty fields
-    for (let field of requiredFields) {
-
-      if (formData[field] === "") {
-
-        alert("Please fill all numerical fields.")
-
-        return
-      }
-    }
-
-
-    // Attendance validation
-    if (
-      formData.Attendance < 0 ||
-      formData.Attendance > 100
-    ) {
-
-      alert("Attendance must be between 0 and 100.")
-
-      return
-    }
-
-
-    // Previous score validation
-    if (
-      formData.Previous_Scores < 0 ||
-      formData.Previous_Scores > 100
-    ) {
-
-      alert("Previous Score must be between 0 and 100.")
-
-      return
-    }
-
-
-    // Hours studied validation
-    if (formData.Hours_Studied < 0) {
-
-      alert("Hours Studied cannot be negative.")
-
-      return
-    }
-
-
-    // Tutoring validation
-    if (formData.Tutoring_Sessions < 0) {
-
-      alert("Tutoring Sessions cannot be negative.")
-
-      return
-    }
-
-
-    // Sleep validation
-    if (
-      formData.Sleep_Hours < 0 ||
-      formData.Sleep_Hours > 24
-    ) {
-
-      alert("Sleep Hours must be between 0 and 24.")
-
-      return
-    }
-
-
-    // Physical activity validation
-    if (
-      formData.Physical_Activity < 0 ||
-      formData.Physical_Activity > 24
-    ) {
-
-      alert("Physical Activity must be between 0 and 24.")
-
-      return
-    }
-
-
+  async function loadHistory() {
     try {
-
-      setLoading(true)
-
-
-      const response = await fetch(
-        "http://127.0.0.1:5000/predict",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json"
-          },
-
-          body: JSON.stringify(formData)
-        }
-      )
-
+      const response = await fetch(`${API_URL}/history`);
 
       if (!response.ok) {
-
-        throw new Error("Prediction failed")
+        throw new Error("Could not load prediction history.");
       }
 
+      const data = await response.json();
 
-      const result = await response.json()
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid history response.");
+      }
 
-
-      // Show prediction result
-      setPrediction(result)
-
-
-      // Refresh prediction history
-      const historyResponse = await fetch(
-        "http://127.0.0.1:5000/history"
-      )
-
-
-      const historyData =
-        await historyResponse.json()
-
-
-      setHistory(historyData)
-
-
-      setLoading(false)
-
-    } catch (error) {
-
-      console.log(error)
-
-      setLoading(false)
-
-      alert(
-        "Unable to connect to Flask backend."
-      )
+      setHistory(data);
+    } catch (err) {
+      console.error("History error:", err);
+      setError(err.message);
     }
   }
 
+  useEffect(() => {
+    loadHistory();
+  }, []);
 
-  // Clear form
-  const handleClear = () => {
+  function handleChange(event) {
+    const { name, value } = event.target;
 
-    setFormData({
-      Hours_Studied: "",
-      Attendance: "",
-      Previous_Scores: "",
-      Tutoring_Sessions: "",
-      Sleep_Hours: "",
-      Physical_Activity: "",
-
-      Parental_Involvement: "Medium",
-      Access_to_Resources: "Medium",
-      Motivation_Level: "Medium",
-      Teacher_Quality: "Medium",
-      Family_Income: "Medium",
-      Peer_Influence: "Neutral",
-
-      Extracurricular_Activities: "No",
-      Internet_Access: "Yes",
-      School_Type: "Public",
-      Learning_Disabilities: "No",
-
-      Parental_Education_Level: "College",
-      Distance_from_Home: "Near",
-      Gender: "Female"
-    })
-
-    setPrediction(null)
+    setFormData((previous) => ({
+      ...previous,
+      [name]: value
+    }));
   }
 
+  function validateForm() {
+    for (const [field, [minimum, maximum]] of Object.entries(
+      numericRanges
+    )) {
+      const value = formData[field];
 
-  // Reset prediction history
-  const handleResetHistory = async () => {
+      if (value === "") {
+        return "Please fill in all numerical fields.";
+      }
 
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete all prediction history?"
-    )
+      const number = Number(value);
 
-
-    if (!confirmDelete) {
-      return
+      if (
+        !Number.isFinite(number) ||
+        number < minimum ||
+        number > maximum
+      ) {
+        return `${field.replaceAll("_", " ")} must be between ${minimum} and ${maximum}.`;
+      }
     }
 
+    return null;
+  }
+
+  async function handlePredict() {
+    setError("");
+
+    const validationError = validateForm();
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
     try {
+      setLoading(true);
+      setPrediction(null);
 
-      const response = await fetch(
-        "http://127.0.0.1:5000/history",
-        {
-          method: "DELETE"
-        }
-      )
+      const response = await fetch(`${API_URL}/predict`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(formData)
+      });
 
+      const result = await response.json();
 
-      if (response.ok) {
-
-        setHistory([])
-
-        alert(
-          "Prediction history deleted successfully."
-        )
+      if (!response.ok) {
+        throw new Error(
+          result.error || "Prediction failed. Please try again."
+        );
       }
 
-    } catch (error) {
+      const score = Number(result.predicted_score);
 
-      console.log(error)
+      if (!Number.isFinite(score)) {
+        throw new Error("Flask returned an invalid prediction.");
+      }
 
-      alert(
-        "Unable to delete prediction history."
-      )
+      if (!result.performance) {
+        throw new Error(
+          "Flask did not return a performance category."
+        );
+      }
+
+      setPrediction({
+        predicted_score: score,
+        performance: result.performance
+      });
+
+      await loadHistory();
+    } catch (err) {
+      console.error("Prediction error:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   }
 
+  function handleClear() {
+    setFormData({ ...initialFormData });
+    setPrediction(null);
+    setError("");
+  }
+
+  async function handleResetHistory() {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete all prediction history?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setError("");
+
+      const response = await fetch(`${API_URL}/history`, {
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          "Could not delete history. Check whether Flask supports DELETE /history."
+        );
+      }
+
+      setHistory([]);
+      setPrediction(null);
+    } catch (err) {
+      console.error("Delete history error:", err);
+      setError(err.message);
+    }
+  }
 
   return (
-
     <div className="app">
 
-      <h1>
-        Student Performance Prediction System
-      </h1>
-
+      <h1>Student Performance Prediction System</h1>
 
       <p className="app-description">
-        Predict a student's exam score based on
-        academic, lifestyle, and environmental factors.
+        Predict a student's exam score based on academic,
+        lifestyle, and environmental factors.
       </p>
-
 
       <div className="form-container">
 
-        <h2>
-          Student Information
-        </h2>
-
-
-        {/* Academic Information */}
+        <h2>Student Information</h2>
 
         <h3 className="section-title">
           Academic Information
         </h3>
 
+        {/* Hours Studied */}
+        <div className="input-group">
+          <label>Hours Studied</label>
 
-        <label>
-          Hours Studied
-        </label>
+          <input
+            type="number"
+            name="Hours_Studied"
+            value={formData.Hours_Studied}
+            onChange={handleChange}
+            min="1"
+            max="44"
+          />
 
-        <input
-          type="number"
-          name="Hours_Studied"
-          value={formData.Hours_Studied}
-          onChange={handleChange}
-          min="0"
-        />
+          <small>Allowed range: 1–44</small>
+        </div>
 
+        {/* Attendance */}
+        <div className="input-group">
+          <label>Attendance (%)</label>
 
-        <label>
-          Attendance (%)
-        </label>
+          <input
+            type="number"
+            name="Attendance"
+            value={formData.Attendance}
+            onChange={handleChange}
+            min="60"
+            max="100"
+          />
 
-        <input
-          type="number"
-          name="Attendance"
-          value={formData.Attendance}
-          onChange={handleChange}
-          min="0"
-          max="100"
-        />
+          <small>Allowed range: 60–100</small>
+        </div>
 
+        {/* Previous Scores */}
+        <div className="input-group">
+          <label>Previous Scores</label>
 
-        <label>
-          Previous Scores
-        </label>
+          <input
+            type="number"
+            name="Previous_Scores"
+            value={formData.Previous_Scores}
+            onChange={handleChange}
+            min="50"
+            max="100"
+          />
 
-        <input
-          type="number"
-          name="Previous_Scores"
-          value={formData.Previous_Scores}
-          onChange={handleChange}
-          min="0"
-          max="100"
-        />
+          <small>Allowed range: 50–100</small>
+        </div>
 
+        {/* Tutoring Sessions */}
+        <div className="input-group">
+          <label>Tutoring Sessions</label>
 
-        <label>
-          Tutoring Sessions
-        </label>
+          <input
+            type="number"
+            name="Tutoring_Sessions"
+            value={formData.Tutoring_Sessions}
+            onChange={handleChange}
+            min="0"
+            max="8"
+            step="1"
+          />
 
-        <input
-          type="number"
-          name="Tutoring_Sessions"
-          value={formData.Tutoring_Sessions}
-          onChange={handleChange}
-          min="0"
-        />
-
-
-        {/* Student Lifestyle */}
+          <small>Allowed range: 0–8</small>
+        </div>
 
         <h3 className="section-title">
           Student Lifestyle
         </h3>
 
+        {/* Sleep Hours */}
+        <div className="input-group">
+          <label>Sleep Hours</label>
 
-        <label>
-          Sleep Hours
-        </label>
+          <input
+            type="number"
+            name="Sleep_Hours"
+            value={formData.Sleep_Hours}
+            onChange={handleChange}
+            min="4"
+            max="10"
+          />
 
-        <input
-          type="number"
-          name="Sleep_Hours"
-          value={formData.Sleep_Hours}
-          onChange={handleChange}
-          min="0"
-          max="24"
-        />
+          <small>Allowed range: 4–10</small>
+        </div>
 
+        {/* Physical Activity */}
+        <div className="input-group">
+          <label>Physical Activity</label>
 
-        <label>
-          Physical Activity
-        </label>
+          <input
+            type="number"
+            name="Physical_Activity"
+            value={formData.Physical_Activity}
+            onChange={handleChange}
+            min="0"
+            max="6"
+          />
 
-        <input
-          type="number"
-          name="Physical_Activity"
-          value={formData.Physical_Activity}
-          onChange={handleChange}
-          min="0"
-          max="24"
-        />
-
-
-        {/* Environment and Support */}
+          <small>Allowed range: 0–6</small>
+        </div>
 
         <h3 className="section-title">
           Environment & Support
         </h3>
 
-
-        <label>
-          Parental Involvement
-        </label>
-
+        <label>Parental Involvement</label>
         <select
           name="Parental_Involvement"
           value={formData.Parental_Involvement}
@@ -445,11 +350,7 @@ function App() {
           <option>High</option>
         </select>
 
-
-        <label>
-          Access to Resources
-        </label>
-
+        <label>Access to Resources</label>
         <select
           name="Access_to_Resources"
           value={formData.Access_to_Resources}
@@ -460,11 +361,7 @@ function App() {
           <option>High</option>
         </select>
 
-
-        <label>
-          Motivation Level
-        </label>
-
+        <label>Motivation Level</label>
         <select
           name="Motivation_Level"
           value={formData.Motivation_Level}
@@ -475,11 +372,7 @@ function App() {
           <option>High</option>
         </select>
 
-
-        <label>
-          Teacher Quality
-        </label>
-
+        <label>Teacher Quality</label>
         <select
           name="Teacher_Quality"
           value={formData.Teacher_Quality}
@@ -490,11 +383,7 @@ function App() {
           <option>High</option>
         </select>
 
-
-        <label>
-          Family Income
-        </label>
-
+        <label>Family Income</label>
         <select
           name="Family_Income"
           value={formData.Family_Income}
@@ -505,11 +394,7 @@ function App() {
           <option>High</option>
         </select>
 
-
-        <label>
-          Peer Influence
-        </label>
-
+        <label>Peer Influence</label>
         <select
           name="Peer_Influence"
           value={formData.Peer_Influence}
@@ -520,11 +405,7 @@ function App() {
           <option>Positive</option>
         </select>
 
-
-        <label>
-          Extracurricular Activities
-        </label>
-
+        <label>Extracurricular Activities</label>
         <select
           name="Extracurricular_Activities"
           value={formData.Extracurricular_Activities}
@@ -534,11 +415,7 @@ function App() {
           <option>No</option>
         </select>
 
-
-        <label>
-          Internet Access
-        </label>
-
+        <label>Internet Access</label>
         <select
           name="Internet_Access"
           value={formData.Internet_Access}
@@ -548,11 +425,7 @@ function App() {
           <option>No</option>
         </select>
 
-
-        <label>
-          School Type
-        </label>
-
+        <label>School Type</label>
         <select
           name="School_Type"
           value={formData.School_Type}
@@ -562,11 +435,7 @@ function App() {
           <option>Private</option>
         </select>
 
-
-        <label>
-          Learning Disabilities
-        </label>
-
+        <label>Learning Disabilities</label>
         <select
           name="Learning_Disabilities"
           value={formData.Learning_Disabilities}
@@ -576,11 +445,7 @@ function App() {
           <option>No</option>
         </select>
 
-
-        <label>
-          Parental Education Level
-        </label>
-
+        <label>Parental Education Level</label>
         <select
           name="Parental_Education_Level"
           value={formData.Parental_Education_Level}
@@ -591,11 +456,7 @@ function App() {
           <option>Postgraduate</option>
         </select>
 
-
-        <label>
-          Distance from Home
-        </label>
-
+        <label>Distance from Home</label>
         <select
           name="Distance_from_Home"
           value={formData.Distance_from_Home}
@@ -606,11 +467,7 @@ function App() {
           <option>Far</option>
         </select>
 
-
-        <label>
-          Gender
-        </label>
-
+        <label>Gender</label>
         <select
           name="Gender"
           value={formData.Gender}
@@ -620,19 +477,13 @@ function App() {
           <option>Male</option>
         </select>
 
-
-        {/* Buttons */}
-
         <button
           className="predict-btn"
           onClick={handlePredict}
           disabled={loading}
         >
-          {loading
-            ? "Predicting..."
-            : "Predict Exam Score"}
+          {loading ? "Predicting..." : "Predict Exam Score"}
         </button>
-
 
         <button
           className="clear-btn"
@@ -641,48 +492,41 @@ function App() {
           Clear
         </button>
 
-
-        {/* Prediction Result */}
+        {error && (
+          <p
+            role="alert"
+            style={{
+              color: "red",
+              marginTop: "15px"
+            }}
+          >
+            {error}
+          </p>
+        )}
 
         {prediction && (
-
           <div
             className={`prediction-result ${prediction.performance
               .toLowerCase()
-              .replaceAll(" ", "-")
-              }`}
+              .replaceAll(" ", "-")}`}
           >
-
-            <h2>
-              Prediction Result
-            </h2>
-
+            <h2>Prediction Result</h2>
 
             <div className="score-display">
-
-              <span>
-                Predicted Exam Score
-              </span>
+              <span>Predicted Exam Score</span>
 
               <strong>
-                {prediction.predicted_score} / 100
+                {prediction.predicted_score.toFixed(2)}
               </strong>
-
             </div>
 
-
             <div className="performance-display">
-
-              <span>
-                Performance
-              </span>
+              <span>Performance</span>
 
               <strong>
                 {prediction.performance}
               </strong>
-
             </div>
-
 
             <p className="prediction-message">
               {prediction.performance === "Excellent" &&
@@ -697,16 +541,13 @@ function App() {
               {prediction.performance === "Needs Improvement" &&
                 "Your score needs improvement. Try increasing your study hours and maintaining regular attendance."}
             </p>
-
           </div>
         )}
 
       </div>
 
-
-      {/* Prediction History */}
-
       <div className="history-section">
+
         <div className="stats-container">
 
           <div className="stat-card">
@@ -730,70 +571,36 @@ function App() {
           </div>
 
         </div>
-        <h2>
-          Prediction History
-        </h2>
 
+        <h2>Prediction History</h2>
 
         {history.length === 0 ? (
-
           <p className="no-history">
             No predictions yet.
           </p>
-
         ) : (
-
           <>
-
             <table className="history-table">
 
               <thead>
-
                 <tr>
-
-                  <th>
-                    ID
-                  </th>
-
-                  <th>
-                    Predicted Score
-                  </th>
-
-                  <th>
-                    Performance
-                  </th>
-
+                  <th>ID</th>
+                  <th>Predicted Score</th>
+                  <th>Performance</th>
                 </tr>
-
               </thead>
 
-
               <tbody>
-
                 {history.map((record) => (
-
-                  <tr key={record[0]}>
-
-                    <td>
-                      {record[0]}
-                    </td>
-
-                    <td>
-                      {record[1]}
-                    </td>
-
-                    <td>
-                      {record[2]}
-                    </td>
-
+                  <tr key={record.id}>
+                    <td>{record.id}</td>
+                    <td>{record.predicted_score}</td>
+                    <td>{record.performance}</td>
                   </tr>
-
                 ))}
-
               </tbody>
 
             </table>
-
 
             <button
               className="reset-history-btn"
@@ -801,30 +608,18 @@ function App() {
             >
               Reset History
             </button>
-
           </>
-
         )}
 
       </div>
 
-
-      {/* Footer */}
-
       <footer className="footer">
-
-        <p>
-          Student Performance Prediction System
-        </p>
-
-        <p>
-          Built with React, Flask and Machine Learning
-        </p>
-
+        <p>Student Performance Prediction System</p>
+        <p>Built with React, Flask and Machine Learning</p>
       </footer>
 
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

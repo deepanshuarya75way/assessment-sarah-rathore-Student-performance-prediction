@@ -5,15 +5,15 @@ import pandas as pd
 import numpy as np
 from database import sqlite3
 import sqlite3
-from database import save_prediction
+from database import( save_prediction,init_db,get_predictions,delete_predictions,save_feedback,prepare_training_dataset,TRAINING_DATASET)
 
 app = Flask(__name__)
-CORS(app)
+CORS(app,origins=["http://localhost:5173","http://127.0.0.1.5173"])
 
 # Load trained model and encoder
 model = joblib.load("student_performance-model.pkl")
 encoder = joblib.load("student_performance_encoder.pkl")
-
+MODEL_VERSION=1.0
 df = pd.read_csv("StudentPerformanceFactors.csv")
 
 # Separate input columns
@@ -31,7 +31,7 @@ def home():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-
+    
     # Get data sent from React
     data = request.get_json()
 
@@ -121,7 +121,34 @@ def delete_history():
     return jsonify({
         "message": "Prediction history deleted successfully"
     })
+@app.route("/feedback",methods=["POST"])
+def feedback():
+    data=requested.get_json()
 
+    success,message=save_feedback(
+        data.get("prediction_id"),
+        data.get("feedback"),
+        data.get("actual_exam_score")
+    )
+if not success:
+    return jsonify({"error":message}),400
+
+return jsonify({"message":message})
+
+@app.route("/prepare-dataset",methods=["POST"])
+def prepare_dataset():
+    success,message,count=prepare_training_dataset()
+    return jsonify({"message":message,"records":count})
+
+@app.route("/training-dataset")
+def training_datset():
+    if not TRAINING_DATASET.exists():
+        return jsonify({"error":"dataset not ready"}),404
+    return send_files(
+        TRAINING_DATASET,as_attachment=True,
+
+download_name="feedback_training_dataset.csv"
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)
